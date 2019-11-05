@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include "UnitTest.cpp"
-#include "Referee.h"
-#include "Player1.h"
+#include "Player2.h"
 
 #pragma GCC optimize("-O3")
 #pragma GCC optimize("inline")
@@ -17,7 +16,8 @@
 using namespace std;
 using namespace std::chrono;
 
-namespace P1 {
+namespace P2 {
+    
     bool play(State& s, int house_played);
     bool playHim(State& s, int house_played);
     int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta);
@@ -50,7 +50,6 @@ namespace P1 {
     int inc = 0;
 
     int main() {
-
         while(1) {
             int arr[12];
             uint8_t total_seeds = 0;
@@ -58,7 +57,7 @@ namespace P1 {
                 int seeds;
                 cin >> seeds; cin.ignore();
                 arr[i] = seeds;
-            total_seeds += seeds;
+                total_seeds += seeds;
             }
             
             nbSim = 0;
@@ -129,17 +128,6 @@ namespace P1 {
         return scoreBoard;
     }
 
-    inline uint8_t cpTotalSeeds(State& s){
-        uint8_t total = 0;
-        for (inc = 0; inc < 6; inc++) {
-            total += (s.me >> (inc * 5)) & 0b11111;
-        }
-        for (inc = 0; inc < 6; inc++) {
-            total += (s.him >> (inc * 5)) & 0b11111;
-        }
-        return total;
-    }
-
     inline int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
 
         nbSim++;
@@ -154,7 +142,7 @@ namespace P1 {
             for (int i = 0; i < 6; i++) {
                 if ((s.me & (0b11111 << 5*i))) {
                     State ns = s;
-                    if (P1::play(ns, i)) {
+                    if (play(ns, i)) {
                         int res = minimax(ns, depth+1, 0, alpha, beta);
                         if (res > best) {
                             best = res;
@@ -183,7 +171,7 @@ namespace P1 {
             for (int i = 0; i < 6; i++) {
                 if ((s.him & (0b11111 << 5*i))) {
                     State ns = s;
-                    if (P1::playHim(ns, i)) {
+                    if (playHim(ns, i)) {
                         best = min(best, minimax(ns, depth+1, 1, alpha, beta));
                         beta = min(beta, best);
                         if (beta <= alpha)

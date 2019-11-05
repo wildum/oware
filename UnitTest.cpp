@@ -1,6 +1,8 @@
 #include <iostream>
 #include <bitset>
 #include "Player1.h"
+#include "Player2.h"
+#include "Referee.h"
 #include <cassert>
 
 using namespace std;
@@ -27,7 +29,7 @@ void testAll() {
 }
 
 void testCpBoardScore () {
-    assert(cpBoardScore(0b00000000011001010110001001101000) == 67);
+    assert(P1::cpBoardScore(0b00000000011001010110001001101000) == 67);
 }
 
 void testParseInput() {
@@ -45,8 +47,8 @@ void testParseInput() {
             s.him = (s.him << 5) | arr[i];
         }
     }
-    play(s, 0);
-    playHim(s, 5);
+    P1::play(s, 0);
+    P1::playHim(s, 5);
     assert(s.me  == 0b00001000011000110001110100000001);
     assert(s.him == 0b00000000000000100001000010000100);
 }
@@ -73,7 +75,7 @@ void utestCapture() {
 
     int house_played = 4;
 
-    play(s, house_played);
+    P1::play(s, house_played);
 
     assert(235083974 == s.me);
     assert(36700290 == s.him);
@@ -90,7 +92,7 @@ void utestNotPossible() {
 
     int house_played = 0;
 
-    assert(!play(s, house_played));
+    assert(!P1::play(s, house_played));
 }
 
 void utestPossible() {
@@ -102,7 +104,7 @@ void utestPossible() {
 
     int house_played = 5;
 
-    assert(play(s, house_played));
+    assert(P1::play(s, house_played));
 }
 
 void utestBigTest() {
@@ -115,7 +117,7 @@ void utestBigTest() {
 
     int house_played = 4;
 
-    play(s, house_played);
+    P1::play(s, house_played);
     assert(302266824 == s.me);
     assert(83074158 == s.him);
     assert(0 == s.me_score);
@@ -132,7 +134,7 @@ void utestBigTestHim() {
 
     int house_played = 4;
 
-    playHim(s, house_played);
+    P1::playHim(s, house_played);
 
     assert(302266824 == s.him);
     assert(83074158 == s.me);

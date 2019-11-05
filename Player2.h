@@ -1,7 +1,7 @@
 #include "Referee.h"
-#ifndef PLAYER1_H
-#define PLAYER1_H
-namespace P1 {
+#ifndef PLAYER2_H
+#define PLAYER2_H
+namespace P2 {
     const int MAX = 1000;
     const int MIN = -1000;
     int maxDepth = 13;
