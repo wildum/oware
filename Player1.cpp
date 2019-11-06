@@ -153,7 +153,7 @@ namespace P1 {
             int best = MIN;
             int solution = 0;
             for (int i = 0; i < 6; i++) {
-                if ((s.me & (0b11111 << 5*i))) {
+                if ((s.me & (0b11111 << 5*i)) && (s.him || ((s.me >> (i * 5)) & 0b11111) > 5 - i)) {
                     State ns = s;
                     if (play(ns, i)) {
                         int res = minimax(ns, depth+1, 0, alpha, beta);
