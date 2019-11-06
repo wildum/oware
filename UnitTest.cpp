@@ -3,6 +3,7 @@
 #include "Player1.h"
 #include "Player2.h"
 #include "Referee.h"
+#include "UnitTest.h"
 #include <cassert>
 
 using namespace std;

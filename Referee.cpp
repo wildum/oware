@@ -1,14 +1,17 @@
 #include "Player1.h"
 #include "Player2.h"
 #include "Referee.h"
+#include "UnitTest.h"
 #include <iostream>
 
 using namespace std;
 
 const int TURN_MAX = 200;
+const int MAX = 1000;
+const int MIN = -1000;
 
 bool is_finished(State& s, int turn);
-void print_end_game(State& s, int player);
+void print_end_game(State& s, int player, int turn);
 
 int main() {
     int turn = 0;
@@ -18,34 +21,38 @@ int main() {
     s.him = 0b001000010000100001000010000100;
     s.me_score = 0;
     s.him_score = 0;
+    testAll();
     while (1) {
         int move = 0;
         if (current_player) {
-            move = P1::minimax(s, P1::maxDepth, true, P1::MIN, P1::MAX);
+            move = P1::minimax(s, 0, true, MIN, MAX);
         } else {
-            move = P2::minimax(s, P2::maxDepth, true, P2::MIN, P2::MAX);
+            move = P2::minimax(s, 0, true, MIN, MAX);
         }
         P1::play(s, move);
         if (is_finished(s, turn)) {
-            print_end_game(s, current_player);
+            print_end_game(s, current_player, turn);
             break;
         }
         swap(s.me, s.him);
+        swap(s.me_score, s.him_score);
         current_player*=-1;
         turn++;
     }
 }
 
 inline bool is_finished(State& s, int turn) {
-    return !(turn != 200 && s.him && s.me_score >= 25 && s.him_score >= 25);
+    return !(turn != 200 && s.him && s.me_score < 25 && s.him_score < 25);
 }
 
-void print_end_game(State& s, int player) {
+void print_end_game(State& s, int player, int turn) {
     if (player == 1) {
-        cout << "Player 1 score : " << s.me_score << endl;
-        cout << "Player 2 score : " << s.him_score << endl;
+        cout << "Player 1 score : " << unsigned(s.me_score) << endl;
+        cout << "Player 2 score : " << unsigned(s.him_score) << endl;
+        cout << "Turn : " << turn << endl;
     } else {
-        cout << "Player 1 score : " << s.him_score << endl;
-        cout << "Player 2 score : " << s.me_score << endl;
+        cout << "Player 1 score : " << unsigned(s.him_score) << endl;
+        cout << "Player 2 score : " << unsigned(s.me_score) << endl;
+        cout << "Turn : " << turn << endl;
     }
 }

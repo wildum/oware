@@ -2,7 +2,7 @@
 #include <bitset>
 #include <algorithm>
 #include <chrono>
-#include "UnitTest.cpp"
+#include "UnitTest.h"
 #include "Player2.h"
 
 #pragma GCC optimize("-O3")
@@ -22,10 +22,6 @@ namespace P2 {
     bool playHim(State& s, int house_played);
     int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta);
 
-    const int MAX = 1000;
-    const int MIN = -1000;
-    int maxDepth = 13;
-
     const uint32_t FULL_HOUSE = 34636833;
 
     uint8_t my_new_score = 0;
@@ -33,6 +29,10 @@ namespace P2 {
     uint8_t prev_score = 0;
     uint8_t prev_him_score = 0;
     uint8_t potential_score = 0;
+
+    const int MAX = 1000;
+    const int MIN = -1000;
+    int maxDepth = 13;
 
     int malus = 0;
     int value = 0;
@@ -128,7 +128,7 @@ namespace P2 {
         return scoreBoard;
     }
 
-    inline int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
+    int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
 
         nbSim++;
 

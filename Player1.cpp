@@ -2,7 +2,7 @@
 #include <bitset>
 #include <algorithm>
 #include <chrono>
-#include "UnitTest.cpp"
+#include "UnitTest.h"
 #include "Referee.h"
 #include "Player1.h"
 
@@ -21,10 +21,7 @@ namespace P1 {
     bool play(State& s, int house_played);
     bool playHim(State& s, int house_played);
     int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta);
-
-    const int MAX = 1000;
-    const int MIN = -1000;
-    int maxDepth = 13;
+    int cpBoardScore(uint32_t board);
 
     const uint32_t FULL_HOUSE = 34636833;
 
@@ -33,6 +30,10 @@ namespace P1 {
     uint8_t prev_score = 0;
     uint8_t prev_him_score = 0;
     uint8_t potential_score = 0;
+
+    const int MAX = 1000;
+    const int MIN = -1000;
+    int maxDepth = 13;
 
     int malus = 0;
     int value = 0;
@@ -121,7 +122,7 @@ namespace P1 {
         return s.me_score - s.him_score;
     }
 
-    inline int cpBoardScore(uint32_t board) {
+    int cpBoardScore(uint32_t board) {
         scoreBoard = 0;
         for (inc = 0; inc < 6; inc++) {
             scoreBoard += (board >> (inc * 5)) & 0b11111;
@@ -140,7 +141,7 @@ namespace P1 {
         return total;
     }
 
-    inline int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
+    int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
 
         nbSim++;
 
@@ -154,14 +155,14 @@ namespace P1 {
             for (int i = 0; i < 6; i++) {
                 if ((s.me & (0b11111 << 5*i))) {
                     State ns = s;
-                    if (P1::play(ns, i)) {
+                    if (play(ns, i)) {
                         int res = minimax(ns, depth+1, 0, alpha, beta);
                         if (res > best) {
                             best = res;
                             solution = i;
                             if (depth == 0) {
                                 my_new_score = ns.me_score;
-                                cerr << "Bowl " << solution << " : " << best << endl;
+                                //cerr << "Bowl " << solution << " : " << best << endl;
                             }
                         }
                         alpha = max(alpha, best);
@@ -183,7 +184,7 @@ namespace P1 {
             for (int i = 0; i < 6; i++) {
                 if ((s.him & (0b11111 << 5*i))) {
                     State ns = s;
-                    if (P1::playHim(ns, i)) {
+                    if (playHim(ns, i)) {
                         best = min(best, minimax(ns, depth+1, 1, alpha, beta));
                         beta = min(beta, best);
                         if (beta <= alpha)
