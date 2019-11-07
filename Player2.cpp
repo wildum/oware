@@ -24,13 +24,40 @@ namespace P2 {
         g_seed = (214013*g_seed+2531011); 
         return (g_seed>>16)&0x7FFF; 
     }
+
+    struct Node {
+        vector<Node*> childs;
+        State state;
+        Node* parent;
+        double winscore = 0;
+        int visitCount = 0;
+        int turn = 0;
+        bool myTurn = true;
+        bool leaf = false;
+        ~Node() {
+            for (int i = 0; i < childs.size(); i++) {
+                delete childs[i];
+            }
+            delete parent;
+        }
+    };
+
+    struct Tree {
+        Node* root;
+        ~Tree() {delete root;}
+    };
     
     bool play(State& s, int house_played);
     bool playHim(State& s, int house_played);
-    int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta);
-
-    struct Tree;
-    struct Node;
+    inline double uctValue(int totalVisit, double nodeWinScore, int nodeVisit);
+    inline bool simulateRandomPlayout(Node* n);
+    inline bool is_finished(State& s, int turn, bool iPlayNext);
+    inline void backPropogation(Node* nodeToExplore, bool meWon);
+    void expand(Node* n);
+    inline Node* selectPromisingNode();
+    inline Node* findBestNodeWithBestWinScore(Node* node);
+    inline Node* findBestNodeWithUTC(Node* node);
+    int MCTS();
 
     const uint32_t FULL_HOUSE = 34636833;
 
@@ -42,6 +69,7 @@ namespace P2 {
 
     const int MAX = 1000;
     const int MIN = -1000;
+    const int MAX_HOUSE = 6;
     int maxDepth = 13;
 
     int malus = 0;
@@ -51,8 +79,6 @@ namespace P2 {
 
     const uint32_t values[] = {0, 1, 33, 1057, 33825, 1082401, 34636833 };
     const uint32_t initValues[] = {34636832, 34636800, 34635776, 34603008, 33554432};
-
-    int nbSim = 0;
 
     int last_house = 0;
     int turn = 0;
@@ -75,8 +101,6 @@ namespace P2 {
                 arr[i] = seeds;
                 total_seeds += seeds;
             }
-            
-            nbSim = 0;
 
             // int arr[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
             // uint8_t total_seeds = 48;
@@ -103,24 +127,39 @@ namespace P2 {
             tree.root = new Node();
             tree.root -> parent = NULL;
             tree.root -> state = s;
+            tree.root -> turn = turn;
+            tree.root -> myTurn = true;
 
             int sol = 0;
-            high_resolution_clock::time_point start = high_resolution_clock::now();
             //testAll();
             if (turn == 0) {
                 sol = 5;
             } else {
-                sol = minimax(s, 0, true, MIN, MAX);
+                sol = MCTS();
             }
-            high_resolution_clock::time_point end = high_resolution_clock::now();
-
             cout << sol << endl;
-            cerr << "Simulations : " << nbSim << endl;
-            cerr << "Time : " << duration_cast<microseconds>( (end - start) ).count()/1000.0 << " ms" << endl;
             turn++;
         }
 
         return 0;
+    }
+
+    int MCTS() {
+        int sol = 0;
+        int nbSim = 0;
+        high_resolution_clock::time_point start = high_resolution_clock::now();
+        // check only every x times
+        while(duration_cast<microseconds>( high_resolution_clock::now() - start).count()/1000.0 < 45) {
+            Node* promisingNode = selectPromisingNode();
+            if (!promisingNode -> leaf) {
+                expand(promisingNode);
+            }
+            
+
+        }
+        cerr << "Simulations : " << nbSim << endl;
+        cerr << "Time : " << duration_cast<microseconds>( (high_resolution_clock::now() - start) ).count()/1000.0 << " ms" << endl;
+        return sol;
     }
 
     inline int eval(State& s) {
@@ -137,66 +176,6 @@ namespace P2 {
             scoreBoard += (board >> (inc * 5)) & 0b11111;
         }
         return scoreBoard;
-    }
-
-    int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
-
-        nbSim++;
-
-        if (depth == maxDepth) {
-            return eval(s);
-        }
-
-        if (maxPlayer) {
-            int best = MIN;
-            int solution = 0;
-            for (int i = 0; i < 6; i++) {
-                if ((s.me & (0b11111 << 5*i))) {
-                    State ns = s;
-                    if (play(ns, i)) {
-                        int res = minimax(ns, depth+1, 0, alpha, beta);
-                        if (res > best) {
-                            best = res;
-                            solution = i;
-                            if (depth == 0) {
-                                my_new_score = ns.me_score;
-                                cerr << "Bowl " << solution << " : " << best << endl;
-                            }
-                        }
-                        alpha = max(alpha, best);
-                        if (beta <= alpha)
-                            break;
-                    }
-                }
-            }
-            if (depth == 0) {
-                return solution;
-            }
-            if (best == MIN) {
-                s.me_score += cpBoardScore(s.me);
-                return eval(s);
-            }
-            return best;
-        } else {
-            int best = MAX;
-            for (int i = 0; i < 6; i++) {
-                if ((s.him & (0b11111 << 5*i))) {
-                    State ns = s;
-                    if (playHim(ns, i)) {
-                        best = min(best, minimax(ns, depth+1, 1, alpha, beta));
-                        beta = min(beta, best);
-                        if (beta <= alpha)
-                            break;
-                    }
-                }
-            }
-            if (best == MAX) {
-                s.him_score += cpBoardScore(s.him);
-                return eval(s);
-            }
-            return best;
-        }
-        return 0;
     }
 
     bool play(State& s, int house_played) {
@@ -291,27 +270,6 @@ namespace P2 {
         return s.me;
     }
 
-    struct Node {
-        vector<Node*> childs;
-        State state;
-        Node* parent;
-        double winscore = 0;
-        int visitCount = 0;
-        int turn = 0;
-        bool myTurn = true;
-        ~Node() {
-            for (int i = 0; i < childs.size(); i++) {
-                delete childs[i];
-            }
-            delete parent;
-        }
-    };
-
-    struct Tree {
-        Node* root;
-        ~Tree() {delete root;}
-    };
-
     inline double uctValue(int totalVisit, double nodeWinScore, int nodeVisit) {
         if (nodeVisit == 0) {
             return numeric_limits<int>::max();
@@ -364,6 +322,7 @@ namespace P2 {
         return node;
     }
 
+    //could expand only one if needed
     void expand(Node* n) {
         bool playAvailable = false;
         if (n -> myTurn) {
@@ -381,8 +340,10 @@ namespace P2 {
                     }
                 }
             }
-            if (!playAvailable)
+            if (!playAvailable) {
                 n -> state.me_score += cpBoardScore(n -> state.me);
+                n -> leaf = true;
+            }
         } else {
             for (int i = 0; i < 6; i++) {
                 if ((n -> state.him & (0b11111 << 5*i))) {
@@ -397,16 +358,19 @@ namespace P2 {
                     }
                 }
             }
-            if (!playAvailable)
+            if (!playAvailable) {
                 n -> state.him_score += cpBoardScore(n -> state.him);
+                n -> leaf = true;
+            }
         }
     }
 
-    inline void backPropogation(Node* nodeToExplore, int playoutResult) {
+    inline void backPropogation(Node* nodeToExplore, bool meWon) {
         Node* tempNode = nodeToExplore;
         while (tempNode != NULL) {
             tempNode  -> visitCount++;
-            tempNode  -> winscore += playoutResult;
+            if (meWon && !tempNode  -> myTurn)
+                tempNode  -> winscore += 1.0;
             tempNode = tempNode -> parent;
         }
     }
@@ -414,11 +378,42 @@ namespace P2 {
     inline bool is_finished(State& s, int turn, bool iPlayNext) {
         return s.me_score >= 25
             || s.him_score >= 25
-            || turn == 200
-            || ((iPlayNext && !s.me) || (!iPlayNext && !s.him));
+            || turn == 200;
     }
 
-    inline int simulateRandomPlayout(Node* n) {
+
+    // stop when you know you cannot win
+    inline bool simulateRandomPlayout(Node* n) {
         // check if the current State is finished ?
+        State tmpState = n -> state;
+        int turn = n -> turn;
+        bool myTurn = n -> myTurn;
+        int house = 0;
+        int house_tested = 0;
+        while (!is_finished(tmpState, turn, myTurn)) {
+            house = fastrand() % 6;
+            house_tested = 0;
+            if (myTurn) {
+                while ((tmpState.me & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !play(tmpState, house_tested)) {
+                    house = house == 5 ? 0 : house + 1;
+                    house_tested++;
+                }
+                if (house_tested == MAX_HOUSE) {
+                    tmpState.me_score += cpBoardScore(n -> state.me);
+                    break;
+                }
+            } else {
+                while ((tmpState.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(tmpState, house_tested)) {
+                    house = house == 5 ? 0 : house + 1;
+                    house_tested++;
+                }
+                if (house_tested == MAX_HOUSE) {
+                    tmpState.him_score += cpBoardScore(n -> state.him);
+                    break;
+                }
+            }
+        }
+        // handle draw ?
+        return tmpState.me_score > tmpState.him_score;
     }
 }
