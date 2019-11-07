@@ -435,7 +435,6 @@ namespace P2 {
                     tmpState.me_score += cpBoardScore(n -> state.me);
                     break;
                 }
-                play(tmpState, house);
             } else {
                 while ((tmpState.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(tmpState, house_tested)) {
                     house = house == 5 ? 0 : house + 1;
@@ -445,7 +444,6 @@ namespace P2 {
                     tmpState.him_score += cpBoardScore(n -> state.him);
                     break;
                 }
-                playHim(tmpState, house);
             }
         }
         cout << "sndtuyi" << endl;
