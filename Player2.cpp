@@ -2,8 +2,10 @@
 #include <bitset>
 #include <algorithm>
 #include <chrono>
+#include <vector>
 #include "UnitTest.h"
 #include "Player2.h"
+#include "math.h"
 
 #pragma GCC optimize("-O3")
 #pragma GCC optimize("inline")
@@ -144,6 +146,33 @@ namespace P2 {
         return 0;
     }
 
+    void destroy() {
+        for (int i = 0; i < nodes_pool.size(); i++) {
+            delete nodes_pool[i];
+        }
+    }
+
+    void initMCTS() {
+        for (int i = 0; i < 2000000; ++i){nodes_pool.push_back(new Node());}
+    }
+
+    int playLocal(State& s, int turn) {
+        tree.root = new Node();
+        tree.root -> parent = NULL;
+        tree.root -> state = s;
+        tree.root -> turn = turn;
+        tree.root -> myTurn = true;
+
+        int sol = 0;
+        if (turn == 0) {
+            sol = 5;
+        } else {
+            sol = MCTS();
+        }
+        cout << "node pool index " << nodes_pool_index << endl;
+        return sol;
+    }
+
     int MCTS() {
         int sol = 0;
         int nbSim = 0;
@@ -154,8 +183,12 @@ namespace P2 {
             if (!promisingNode -> leaf) {
                 expand(promisingNode);
             }
-            
-
+            Node* nodeToExplore = promisingNode;
+            if (promisingNode -> childs.size() > 0) {
+                nodeToExplore = promisingNode -> childs[fastrand() % promisingNode -> childs.size()];
+            }
+            backPropogation(nodeToExplore, simulateRandomPlayout(nodeToExplore));
+            nbSim++;
         }
         cerr << "Simulations : " << nbSim << endl;
         cerr << "Time : " << duration_cast<microseconds>( (high_resolution_clock::now() - start) ).count()/1000.0 << " ms" << endl;
@@ -402,6 +435,7 @@ namespace P2 {
                     tmpState.me_score += cpBoardScore(n -> state.me);
                     break;
                 }
+                play(tmpState, house);
             } else {
                 while ((tmpState.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(tmpState, house_tested)) {
                     house = house == 5 ? 0 : house + 1;
@@ -411,8 +445,10 @@ namespace P2 {
                     tmpState.him_score += cpBoardScore(n -> state.him);
                     break;
                 }
+                playHim(tmpState, house);
             }
         }
+        cout << "sndtuyi" << endl;
         // handle draw ?
         return tmpState.me_score > tmpState.him_score;
     }

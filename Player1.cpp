@@ -33,7 +33,7 @@ namespace P1 {
 
     const int MAX = 1000;
     const int MIN = -1000;
-    int maxDepth = 13;
+    int maxDepth = 5;
 
     int malus = 0;
     int value = 0;

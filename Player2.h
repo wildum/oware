@@ -6,5 +6,8 @@ namespace P2 {
     bool playHim(State& s, int house_played);
     int cpBoardScore(uint32_t board);
     int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta);
+    int playLocal(State& s, int turn);
+    void destroy();
+    void initMCTS();
 }
 #endif

@@ -10,7 +10,7 @@ const int TURN_MAX = 200;
 const int MAX = 1000;
 const int MIN = -1000;
 
-bool is_finished(State& s, int turn, int current_player);
+bool is_finished(State& s, int turn);
 void print_end_game(State& s, int player, int turn);
 
 int main() {
@@ -22,15 +22,16 @@ int main() {
     s.me_score = 0;
     s.him_score = 0;
     testAll();
+    P2::initMCTS();
     while (1) {
         int move = 0;
         if (current_player) {
             move = P1::minimax(s, 0, true, MIN, MAX);
         } else {
-            move = P2::minimax(s, 0, true, MIN, MAX);
+            move = P2::playLocal(s, turn);
         }
         P1::play(s, move);
-        if (is_finished(s, turn, current_player)) {
+        if (is_finished(s, turn)) {
             print_end_game(s, current_player, turn);
             break;
         }
@@ -39,6 +40,7 @@ int main() {
         current_player=!current_player;
         turn++;
     }
+    P2::destroy();
 }
 
 inline bool is_finished(State& s, int turn) {
