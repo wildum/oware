@@ -34,13 +34,15 @@ namespace P2 {
         double winscore = 0;
         int visitCount = 0;
         int turn = 0;
+        int house = 0;
         bool myTurn = true;
         bool leaf = false;
         ~Node() {
-            for (int i = 0; i < childs.size(); i++) {
-                delete childs[i];
-            }
-            delete parent;
+            // for (int i = 0; i < childs.size(); i++) {
+            //     delete childs[i];
+            //     childs[i] = nullptr;
+            // }
+            // childs.clear();
         }
     };
 
@@ -60,6 +62,7 @@ namespace P2 {
     inline Node* findBestNodeWithBestWinScore(Node* node);
     inline Node* findBestNodeWithUTC(Node* node);
     int MCTS();
+    void reuseTree(State& s);
 
     const uint32_t FULL_HOUSE = 34636833;
 
@@ -83,12 +86,14 @@ namespace P2 {
     const uint32_t initValues[] = {34636832, 34636800, 34635776, 34603008, 33554432};
 
     int last_house = 0;
-    int turn = 0;
+    int turnPlay = 0;
+    int lastBestNodeIndex = 0;
 
     int inc = 0;
 
     Tree tree;
 
+    Node* firstNode;
     vector<Node*> nodes_pool;
     int nodes_pool_index = 0;
 
@@ -129,27 +134,27 @@ namespace P2 {
             tree.root = new Node();
             tree.root -> parent = NULL;
             tree.root -> state = s;
-            tree.root -> turn = turn;
+            tree.root -> turn = turnPlay;
             tree.root -> myTurn = true;
 
             int sol = 0;
             //testAll();
-            if (turn == 0) {
+            if (turnPlay == 0) {
                 sol = 5;
+                firstNode = tree.root;
             } else {
                 sol = MCTS();
             }
             cout << sol << endl;
-            turn++;
+            turnPlay++;
         }
 
         return 0;
     }
 
     void destroy() {
-        for (int i = 0; i < nodes_pool.size(); i++) {
-            delete nodes_pool[i];
-        }
+        delete firstNode;
+        nodes_pool.clear();
     }
 
     void initMCTS() {
@@ -157,11 +162,16 @@ namespace P2 {
     }
 
     int playLocal(State& s, int turn) {
-        tree.root = new Node();
-        tree.root -> parent = NULL;
-        tree.root -> state = s;
-        tree.root -> turn = turn;
-        tree.root -> myTurn = true;
+        if (!tree.root) {
+            tree.root = new Node();
+            tree.root -> parent = NULL;
+            tree.root -> state = s;
+            tree.root -> turn = turn;
+            tree.root -> myTurn = true;
+            firstNode = tree.root;
+        } else {
+            reuseTree(s);
+        }
 
         int sol = 0;
         if (turn == 0) {
@@ -191,8 +201,32 @@ namespace P2 {
             nbSim++;
         }
         cerr << "Simulations : " << nbSim << endl;
-        cerr << "Time : " << duration_cast<microseconds>( (high_resolution_clock::now() - start) ).count()/1000.0 << " ms" << endl;
-        return sol;
+        //cerr << "Time : " << duration_cast<microseconds>( (high_resolution_clock::now() - start) ).count()/1000.0 << " ms" << endl;
+        Node* winnerNode = findBestNodeWithBestWinScore(tree.root);
+        if (winnerNode == NULL) {
+            cerr << "No good solution, we have to play something valid" << endl;
+            for (int i = 0; i < 6; i++) {
+                if (tree.root -> state.me & (0b11111 << 5*i)) {
+                    return i;
+                }
+            }
+        }
+        return winnerNode -> house;
+    }
+
+    void reuseTree(State& s) {
+        Node* n = tree.root -> childs[lastBestNodeIndex];
+        for (int i = 0; i < n -> childs.size(); i++) {
+            if (s.me == n -> childs[i] -> state.me && s.him == n -> childs[i] -> state.him) {
+                tree.root =  n -> childs[i];
+                tree.root -> parent = NULL;
+                tree.root -> state = s;
+                tree.root -> turn = turnPlay;
+                tree.root -> myTurn = true;
+                return;
+            }
+        }
+        cerr << "error finding child" << endl;
     }
 
     inline int eval(State& s) {
@@ -339,10 +373,8 @@ namespace P2 {
             if (score_n > score_b) {
                 score_b = score_n;
                 best = n;
+                lastBestNodeIndex = i;
             }
-        }
-        if (best == NULL) {
-            cerr << "ERROR NODE NULL 2" << endl;
         }
         return best;
     }
@@ -368,6 +400,7 @@ namespace P2 {
                         nn -> parent = n;
                         nn -> myTurn = false;
                         nn -> turn = n -> turn + 1;
+                        nn -> house = i;
                         n -> childs.push_back(nn);
                         playAvailable = true;
                     }
@@ -386,6 +419,7 @@ namespace P2 {
                         nn -> state = ns;
                         nn -> parent = n;
                         nn -> myTurn = true;
+                        nn -> house = i;
                         n -> childs.push_back(nn);
                         playAvailable = true;
                     }
@@ -445,8 +479,9 @@ namespace P2 {
                     break;
                 }
             }
+            myTurn = !myTurn;
+            turn++;
         }
-        cout << "sndtuyi" << endl;
         // handle draw ?
         return tmpState.me_score > tmpState.him_score;
     }
