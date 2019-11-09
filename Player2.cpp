@@ -37,18 +37,17 @@ namespace P2 {
         int house = 0;
         bool myTurn = true;
         bool leaf = false;
-        ~Node() {
-            // for (int i = 0; i < childs.size(); i++) {
-            //     delete childs[i];
-            //     childs[i] = nullptr;
-            // }
-            // childs.clear();
-        }
+        // ~Node() {
+        //     // for (int i = 0; i < childs.size(); i++) {
+        //     //     delete childs[i];
+        //     //     childs[i] = nullptr;
+        //     // }
+        //     // childs.clear();
+        // }
     };
 
     struct Tree {
         Node* root;
-        ~Tree() {delete root;}
     };
     
     bool play(State& s, int house_played);
@@ -72,8 +71,6 @@ namespace P2 {
     uint8_t prev_him_score = 0;
     uint8_t potential_score = 0;
 
-    const int MAX = 1000;
-    const int MIN = -1000;
     const int MAX_HOUSE = 6;
     int maxDepth = 13;
 
@@ -91,6 +88,8 @@ namespace P2 {
 
     int inc = 0;
 
+    bool newGame = true;
+
     Tree tree;
 
     Node* firstNode;
@@ -98,7 +97,7 @@ namespace P2 {
     int nodes_pool_index = 0;
 
     int main() {
-        for (int i = 0; i < 2000000; ++i){nodes_pool.push_back(new Node());}
+        for (int i = 0; i < 4000000; ++i){nodes_pool.push_back(new Node());}
         while(1) {
             int arr[12];
             uint8_t total_seeds = 0;
@@ -153,25 +152,33 @@ namespace P2 {
     }
 
     void destroy() {
-        delete firstNode;
+        for (auto p : nodes_pool)
+            delete p;
         nodes_pool.clear();
+        //delete tree.root;
     }
 
     void initMCTS() {
-        for (int i = 0; i < 2000000; ++i){nodes_pool.push_back(new Node());}
+        newGame = true;
+        turnPlay = 0;
+        nodes_pool_index = 0;
+        for (int i = 0; i < 4000000; ++i){nodes_pool.push_back(new Node());}
     }
 
     int playLocal(State& s, int turn) {
-        if (!tree.root) {
+        if (newGame) {
             tree.root = new Node();
             tree.root -> parent = NULL;
             tree.root -> state = s;
             tree.root -> turn = turn;
             tree.root -> myTurn = true;
             firstNode = tree.root;
+            newGame = false;
         } else {
             reuseTree(s);
         }
+
+        turnPlay = turn;
 
         int sol = 0;
         if (turn == 0) {
@@ -179,7 +186,7 @@ namespace P2 {
         } else {
             sol = MCTS();
         }
-        cout << "node pool index " << nodes_pool_index << endl;
+        //cout << "node pool index " << nodes_pool_index << endl;
         return sol;
     }
 
@@ -200,11 +207,11 @@ namespace P2 {
             backPropogation(nodeToExplore, simulateRandomPlayout(nodeToExplore));
             nbSim++;
         }
-        cerr << "Simulations : " << nbSim << endl;
+        if (turnPlay <=1)
+            cerr << "Simulations : " << nbSim << endl;
         //cerr << "Time : " << duration_cast<microseconds>( (high_resolution_clock::now() - start) ).count()/1000.0 << " ms" << endl;
         Node* winnerNode = findBestNodeWithBestWinScore(tree.root);
         if (winnerNode == NULL) {
-            cerr << "No good solution, we have to play something valid" << endl;
             for (int i = 0; i < 6; i++) {
                 if (tree.root -> state.me & (0b11111 << 5*i)) {
                     return i;
@@ -219,6 +226,7 @@ namespace P2 {
         for (int i = 0; i < n -> childs.size(); i++) {
             if (s.me == n -> childs[i] -> state.me && s.him == n -> childs[i] -> state.him) {
                 tree.root =  n -> childs[i];
+                //tree.root -> childs.clear();
                 tree.root -> parent = NULL;
                 tree.root -> state = s;
                 tree.root -> turn = turnPlay;
@@ -419,6 +427,7 @@ namespace P2 {
                         nn -> state = ns;
                         nn -> parent = n;
                         nn -> myTurn = true;
+                        nn -> turn = n -> turn + 1;
                         nn -> house = i;
                         n -> childs.push_back(nn);
                         playAvailable = true;
@@ -435,8 +444,10 @@ namespace P2 {
     inline void backPropogation(Node* nodeToExplore, bool meWon) {
         Node* tempNode = nodeToExplore;
         while (tempNode != NULL) {
-            tempNode  -> visitCount++;
+            tempNode -> visitCount++;
             if (meWon && !tempNode  -> myTurn)
+                tempNode  -> winscore += 1.0;
+            if (!meWon && tempNode  -> myTurn)
                 tempNode  -> winscore += 1.0;
             tempNode = tempNode -> parent;
         }
@@ -445,7 +456,7 @@ namespace P2 {
     inline bool is_finished(State& s, int turn, bool iPlayNext) {
         return s.me_score >= 25
             || s.him_score >= 25
-            || turn == 200;
+            || turn >= 200;
     }
 
 
@@ -461,7 +472,7 @@ namespace P2 {
             house = fastrand() % 6;
             house_tested = 0;
             if (myTurn) {
-                while ((tmpState.me & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !play(tmpState, house_tested)) {
+                while ((tmpState.me & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !play(tmpState, house)) {
                     house = house == 5 ? 0 : house + 1;
                     house_tested++;
                 }
@@ -470,7 +481,7 @@ namespace P2 {
                     break;
                 }
             } else {
-                while ((tmpState.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(tmpState, house_tested)) {
+                while ((tmpState.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(tmpState, house)) {
                     house = house == 5 ? 0 : house + 1;
                     house_tested++;
                 }
