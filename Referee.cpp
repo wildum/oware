@@ -41,7 +41,10 @@ int main() {
             //print_end_game(s, current_player, turn);
             if (is_finished(s, turn)) {
                 print_end_game(s, current_player, turn);
-                if (current_player) {
+                if (s.me_score == s.him_score) {
+                    nbWonByP1++;
+                    nbWonByP2++;
+                } else if (current_player && s.me_score > s.him_score || !current_player && s.me_score < s.him_score) {
                     nbWonByP1++;
                 } else {
                     nbWonByP2++;

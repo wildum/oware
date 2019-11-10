@@ -37,13 +37,6 @@ namespace P2 {
         int house = 0;
         bool myTurn = true;
         bool leaf = false;
-        // ~Node() {
-        //     // for (int i = 0; i < childs.size(); i++) {
-        //     //     delete childs[i];
-        //     //     childs[i] = nullptr;
-        //     // }
-        //     // childs.clear();
-        // }
     };
 
     struct Tree {
@@ -64,6 +57,8 @@ namespace P2 {
     void reuseTree(State& s);
 
     const uint32_t FULL_HOUSE = 34636833;
+
+    const int NB_CHECK_TIME = 100;
 
     uint8_t my_new_score = 0;
     uint8_t prev_seed = 48;
@@ -181,11 +176,11 @@ namespace P2 {
         turnPlay = turn;
 
         int sol = 0;
-        if (turn == 0) {
-            sol = 5;
-        } else {
+        // if (turn == 0) {
+        //     sol = 5;
+        // } else {
             sol = MCTS();
-        }
+        // }
         //cout << "node pool index " << nodes_pool_index << endl;
         return sol;
     }
@@ -194,8 +189,8 @@ namespace P2 {
         int sol = 0;
         int nbSim = 0;
         high_resolution_clock::time_point start = high_resolution_clock::now();
-        // check only every x times
-        while(duration_cast<microseconds>( high_resolution_clock::now() - start).count()/1000.0 < 45) {
+        int timeChecked = 0;
+        while(timeChecked || duration_cast<microseconds>( high_resolution_clock::now() - start).count()/1000.0 < 45) {
             Node* promisingNode = selectPromisingNode();
             if (!promisingNode -> leaf) {
                 expand(promisingNode);
@@ -206,6 +201,7 @@ namespace P2 {
             }
             backPropogation(nodeToExplore, simulateRandomPlayout(nodeToExplore));
             nbSim++;
+            timeChecked = timeChecked == NB_CHECK_TIME ? 0 : timeChecked + 1;
         }
         if (turnPlay <=1)
             cerr << "Simulations : " << nbSim << endl;
@@ -226,7 +222,6 @@ namespace P2 {
         for (int i = 0; i < n -> childs.size(); i++) {
             if (s.me == n -> childs[i] -> state.me && s.him == n -> childs[i] -> state.him) {
                 tree.root =  n -> childs[i];
-                //tree.root -> childs.clear();
                 tree.root -> parent = NULL;
                 tree.root -> state = s;
                 tree.root -> turn = turnPlay;
@@ -445,18 +440,16 @@ namespace P2 {
         Node* tempNode = nodeToExplore;
         while (tempNode != NULL) {
             tempNode -> visitCount++;
-            if (meWon && !tempNode  -> myTurn)
-                tempNode  -> winscore += 1.0;
-            if (!meWon && tempNode  -> myTurn)
+            if (meWon ^ tempNode  -> myTurn)
                 tempNode  -> winscore += 1.0;
             tempNode = tempNode -> parent;
         }
     }
 
-    inline bool is_finished(State& s, int turn, bool iPlayNext) {
+    inline bool is_finished(State& s, int turn, bool iPlayNext, const int MAXTURN) {
         return s.me_score >= 25
             || s.him_score >= 25
-            || turn >= 200;
+            || turn >= MAXTURN;
     }
 
 
@@ -465,10 +458,11 @@ namespace P2 {
         // check if the current State is finished ?
         State tmpState = n -> state;
         int turn = n -> turn;
+        const int MAXTURN = 200;
         bool myTurn = n -> myTurn;
         int house = 0;
         int house_tested = 0;
-        while (!is_finished(tmpState, turn, myTurn)) {
+        while (!is_finished(tmpState, turn, myTurn, MAXTURN)) {
             house = fastrand() % 6;
             house_tested = 0;
             if (myTurn) {
