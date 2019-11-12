@@ -1,6 +1,7 @@
 /*
-    MCTS expand all children
+    MCTS + MINMAX
 */
+
 
 #include <iostream>
 #include <bitset>
@@ -8,8 +9,8 @@
 #include <chrono>
 #include <vector>
 #include "UnitTest.h"
-#include "Player2.h"
-#include <cmath>
+#include "Player3.h"
+#include "math.h"
 
 #pragma GCC optimize("-O3")
 #pragma GCC optimize("inline")
@@ -22,7 +23,7 @@
 using namespace std;
 using namespace std::chrono;
 
-namespace P2 {
+namespace P3 {
 
     long long g_seed = 2345678765;
 
@@ -41,7 +42,6 @@ namespace P2 {
         int house = 0;
         bool myTurn = true;
         bool leaf = false;
-        bool fullyExpanded = false;
     };
 
     struct Tree {
@@ -54,10 +54,11 @@ namespace P2 {
     inline bool simulateRandomPlayout(Node* n);
     inline bool is_finished(State& s, int turn, bool iPlayNext);
     inline void backPropogation(Node* nodeToExplore, bool meWon);
-    bool expand(Node* n);
+    void expand(Node* n);
     inline Node* selectPromisingNode();
     inline Node* findBestNodeWithBestWinScore(Node* node);
     inline Node* findBestNodeWithUTC(Node* node);
+    inline int eval(State& s);
     int MCTS();
     void reuseTree(State& s);
 
@@ -72,11 +73,17 @@ namespace P2 {
     uint8_t potential_score = 0;
 
     const int MAX_HOUSE = 6;
-    int maxDepth = 13;
+
+    const int MAX = 1000;
+    const int MIN = -1000;
+    int maxDepth = 12;
 
     int malus = 0;
     int value = 0;
     int scoreBoard = 0;
+
+    const int MCTSMINMAXRATIO = 2;
+    int MCTSMinMaxRatioCurr = 0;
 
 
     const uint32_t values[] = {0, 1, 33, 1057, 33825, 1082401, 34636833 };
@@ -88,11 +95,8 @@ namespace P2 {
 
     int inc = 0;
 
-    bool newGame = true;
-
     Tree tree;
 
-    Node* firstNode;
     vector<Node*> nodes_pool;
     int nodes_pool_index = 0;
 
@@ -140,7 +144,6 @@ namespace P2 {
             //testAll();
             if (turnPlay == 0) {
                 sol = 5;
-                firstNode = tree.root;
             } else {
                 sol = MCTS();
             }
@@ -159,24 +162,13 @@ namespace P2 {
     }
 
     void initMCTS() {
-        newGame = true;
         turnPlay = 0;
         nodes_pool_index = 0;
         for (int i = 0; i < 4000000; ++i){nodes_pool.push_back(new Node());}
     }
 
     int playLocal(State& s, int turn) {
-        if (newGame) {
-            tree.root = new Node();
-            tree.root -> parent = NULL;
-            tree.root -> state = s;
-            tree.root -> turn = turn;
-            tree.root -> myTurn = true;
-            firstNode = tree.root;
-            newGame = false;
-        } else {
-            reuseTree(s);
-        }
+
 
         turnPlay = turn;
 
@@ -184,11 +176,81 @@ namespace P2 {
         // if (turn == 0) {
         //     sol = 5;
         // } else {
+        if (MCTSMinMaxRatioCurr == MCTSMINMAXRATIO) {
+            sol = minimax(s, 0, true, MIN, MAX);
+            MCTSMinMaxRatioCurr = 0;
+        } else {
+            tree.root = new Node();
+            tree.root -> parent = NULL;
+            tree.root -> state = s;
+            tree.root -> turn = turn;
+            tree.root -> myTurn = true;
             sol = MCTS();
+            MCTSMinMaxRatioCurr++;
+        }
         // }
         //cout << "node pool index " << nodes_pool_index << endl;
         return sol;
     }
+
+    int minimax(State& s, int depth, bool maxPlayer, int alpha, int beta) {
+
+        if (depth == maxDepth) {
+            return eval(s);
+        }
+
+        if (maxPlayer) {
+            int best = MIN;
+            int solution = 0;
+            for (int i = 0; i < 6; i++) {
+                if ((s.me & (0b11111 << 5*i)) && (s.him || ((s.me >> (i * 5)) & 0b11111) > 5 - i)) {
+                    State ns = s;
+                    if (play(ns, i)) {
+                        int res = minimax(ns, depth+1, 0, alpha, beta);
+                        if (res > best) {
+                            best = res;
+                            solution = i;
+                            if (depth == 0) {
+                                my_new_score = ns.me_score;
+                                //cerr << "Bowl " << solution << " : " << best << endl;
+                            }
+                        }
+                        alpha = max(alpha, best);
+                        if (beta <= alpha)
+                            break;
+                    }
+                }
+            }
+            if (depth == 0) {
+                return solution;
+            }
+            if (best == MIN) {
+                s.me_score += cpBoardScore(s.me);
+                return eval(s);
+            }
+            return best;
+        } else {
+            int best = MAX;
+            for (int i = 0; i < 6; i++) {
+                if ((s.him & (0b11111 << 5*i))) {
+                    State ns = s;
+                    if (playHim(ns, i)) {
+                        best = min(best, minimax(ns, depth+1, 1, alpha, beta));
+                        beta = min(beta, best);
+                        if (beta <= alpha)
+                            break;
+                    }
+                }
+            }
+            if (best == MAX) {
+                s.him_score += cpBoardScore(s.him);
+                return eval(s);
+            }
+            return best;
+        }
+        return 0;
+    }
+
 
     int MCTS() {
         int sol = 0;
@@ -197,10 +259,14 @@ namespace P2 {
         int timeChecked = 0;
         while(timeChecked || duration_cast<microseconds>( high_resolution_clock::now() - start).count()/1000.0 < 45) {
             Node* promisingNode = selectPromisingNode();
-            if (!promisingNode -> leaf && expand(promisingNode)) {
-                promisingNode = promisingNode -> childs[fastrand() % promisingNode -> childs.size()];
+            if (!promisingNode -> leaf) {
+                expand(promisingNode);
             }
-            backPropogation(promisingNode, simulateRandomPlayout(promisingNode));
+            Node* nodeToExplore = promisingNode;
+            if (promisingNode -> childs.size() > 0) {
+                nodeToExplore = promisingNode -> childs[fastrand() % promisingNode -> childs.size()];
+            }
+            backPropogation(nodeToExplore, simulateRandomPlayout(nodeToExplore));
             nbSim++;
             timeChecked = timeChecked == NB_CHECK_TIME ? 0 : timeChecked + 1;
         }
@@ -354,10 +420,11 @@ namespace P2 {
         double score_b = numeric_limits<int>::min();
         // TODO optimise the for loop
         for (int i = 0; i < node -> childs.size(); i++) {
-            double score_n = uctValue(parentVisit, node -> childs[i] -> winscore,  node -> childs[i] -> visitCount);
+            Node* n = node -> childs[i];
+            double score_n = uctValue(parentVisit, n -> winscore,  n -> visitCount);
             if (score_n > score_b) {
                 score_b = score_n;
-                best = node -> childs[i];
+                best = n;
             }
         }
         if (best == NULL) {
@@ -384,14 +451,14 @@ namespace P2 {
 
     inline Node* selectPromisingNode() {
         Node* node = tree.root;
-        while (node -> fullyExpanded && !node -> leaf) {
+        while (node -> childs.size() != 0) {
             node = findBestNodeWithUTC(node);
         }
         return node;
     }
 
     //could expand only one if needed
-    bool expand(Node* n) {
+    void expand(Node* n) {
         bool playAvailable = false;
         if (n -> myTurn) {
             for (int i = 0; i < 6; i++) {
@@ -434,8 +501,6 @@ namespace P2 {
                 n -> leaf = true;
             }
         }
-        n -> fullyExpanded = true;
-        return !n -> leaf;
     }
 
     inline void backPropogation(Node* nodeToExplore, bool meWon) {
@@ -460,7 +525,7 @@ namespace P2 {
         // check if the current State is finished ?
         State tmpState = n -> state;
         int turn = n -> turn;
-        const int MAXTURN = 200;
+        const int MAXTURN = turn + 70;
         bool myTurn = n -> myTurn;
         int house = 0;
         int house_tested = 0;

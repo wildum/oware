@@ -1,3 +1,7 @@
+/*
+    MiniMax
+*/
+
 #include <iostream>
 #include <bitset>
 #include <algorithm>

@@ -1,5 +1,7 @@
 #include "Player1.h"
 #include "Player2.h"
+#include "Player3.h"
+#include "Player4.h"
 #include "Referee.h"
 #include "UnitTest.h"
 #include <iostream>
@@ -10,7 +12,7 @@ const int TURN_MAX = 200;
 const int MAX = 1000;
 const int MIN = -1000;
 
-const int NUMBER_OF_GAMES = 20;
+const int NUMBER_OF_GAMES = 3;
 
 bool is_finished(State& s, int turn);
 void print_end_game(State& s, int player, int turn);

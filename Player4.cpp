@@ -8,8 +8,8 @@
 #include <chrono>
 #include <vector>
 #include "UnitTest.h"
-#include "Player2.h"
-#include <cmath>
+#include "Player4.h"
+#include "math.h"
 
 #pragma GCC optimize("-O3")
 #pragma GCC optimize("inline")
@@ -22,7 +22,7 @@
 using namespace std;
 using namespace std::chrono;
 
-namespace P2 {
+namespace P4 {
 
     long long g_seed = 2345678765;
 
@@ -59,7 +59,7 @@ namespace P2 {
     inline Node* findBestNodeWithBestWinScore(Node* node);
     inline Node* findBestNodeWithUTC(Node* node);
     int MCTS();
-    void reuseTree(State& s);
+    bool reuseTree(State& s);
 
     const uint32_t FULL_HOUSE = 34636833;
 
@@ -166,7 +166,7 @@ namespace P2 {
     }
 
     int playLocal(State& s, int turn) {
-        if (newGame) {
+        if (newGame || !reuseTree(s)) {
             tree.root = new Node();
             tree.root -> parent = NULL;
             tree.root -> state = s;
@@ -174,8 +174,6 @@ namespace P2 {
             tree.root -> myTurn = true;
             firstNode = tree.root;
             newGame = false;
-        } else {
-            reuseTree(s);
         }
 
         turnPlay = turn;
@@ -197,7 +195,7 @@ namespace P2 {
         int timeChecked = 0;
         while(timeChecked || duration_cast<microseconds>( high_resolution_clock::now() - start).count()/1000.0 < 45) {
             Node* promisingNode = selectPromisingNode();
-            if (!promisingNode -> leaf && expand(promisingNode)) {
+            if (promisingNode -> childs.size() > 0) {
                 promisingNode = promisingNode -> childs[fastrand() % promisingNode -> childs.size()];
             }
             backPropogation(promisingNode, simulateRandomPlayout(promisingNode));
@@ -218,7 +216,7 @@ namespace P2 {
         return winnerNode -> house;
     }
 
-    void reuseTree(State& s) {
+    bool reuseTree(State& s) {
         Node* n = tree.root -> childs[lastBestNodeIndex];
         for (int i = 0; i < n -> childs.size(); i++) {
             if (s.me == n -> childs[i] -> state.me && s.him == n -> childs[i] -> state.him) {
@@ -227,10 +225,10 @@ namespace P2 {
                 tree.root -> state = s;
                 tree.root -> turn = turnPlay;
                 tree.root -> myTurn = true;
-                return;
+                return true;
             }
         }
-        cerr << "error finding child" << endl;
+        return false;
     }
 
     inline int eval(State& s) {
@@ -354,10 +352,11 @@ namespace P2 {
         double score_b = numeric_limits<int>::min();
         // TODO optimise the for loop
         for (int i = 0; i < node -> childs.size(); i++) {
-            double score_n = uctValue(parentVisit, node -> childs[i] -> winscore,  node -> childs[i] -> visitCount);
+            Node* n = node -> childs[i];
+            double score_n = uctValue(parentVisit, n -> winscore,  n -> visitCount);
             if (score_n > score_b) {
                 score_b = score_n;
-                best = node -> childs[i];
+                best = n;
             }
         }
         if (best == NULL) {
@@ -384,58 +383,64 @@ namespace P2 {
 
     inline Node* selectPromisingNode() {
         Node* node = tree.root;
-        while (node -> fullyExpanded && !node -> leaf) {
+        while (node -> fullyExpanded || (!node -> leaf && expand(node))) {
             node = findBestNodeWithUTC(node);
         }
         return node;
     }
 
-    //could expand only one if needed
+    //one child
     bool expand(Node* n) {
-        bool playAvailable = false;
         if (n -> myTurn) {
-            for (int i = 0; i < 6; i++) {
-                if ((n -> state.me & (0b11111 << 5*i))) {
-                    State ns = n -> state;
-                    if (play(ns, i)) {
-                        Node* nn = nodes_pool[nodes_pool_index++];
-                        nn -> state = ns;
-                        nn -> parent = n;
-                        nn -> myTurn = false;
-                        nn -> turn = n -> turn + 1;
-                        nn -> house = i;
-                        n -> childs.push_back(nn);
-                        playAvailable = true;
-                    }
-                }
+            int house = fastrand() % 6;
+            int house_tested = 0;
+            State ns = n -> state;
+            while ((ns.me & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !play(ns, house)) {
+                house = house == 5 ? 0 : house + 1;
+                house_tested++;
             }
-            if (!playAvailable) {
-                n -> state.me_score += cpBoardScore(n -> state.me);
-                n -> leaf = true;
+            if (house_tested == MAX_HOUSE) {
+                if (n -> childs.size() == 0) {
+                    n -> state.me_score += cpBoardScore(n -> state.me);
+                    n -> leaf = true;
+                } else {
+                    n -> fullyExpanded = true;
+                }
+            } else {
+                Node* nn = nodes_pool[nodes_pool_index++];
+                nn -> state = ns;
+                nn -> parent = n;
+                nn -> myTurn = false;
+                nn -> turn = n -> turn + 1;
+                nn -> house = house;
+                n -> childs.push_back(nn);
             }
         } else {
-            for (int i = 0; i < 6; i++) {
-                if ((n -> state.him & (0b11111 << 5*i))) {
-                    State ns = n -> state;
-                    if (playHim(ns, i)) {
-                        Node* nn = nodes_pool[nodes_pool_index++];
-                        nn -> state = ns;
-                        nn -> parent = n;
-                        nn -> myTurn = true;
-                        nn -> turn = n -> turn + 1;
-                        nn -> house = i;
-                        n -> childs.push_back(nn);
-                        playAvailable = true;
-                    }
-                }
+            int house = fastrand() % 6;
+            int house_tested = 0;
+            State ns = n -> state;
+            while ((ns.him & (0b11111 << 5*house)) && house_tested < MAX_HOUSE && !playHim(ns, house)) {
+                house = house == 5 ? 0 : house + 1;
+                house_tested++;
             }
-            if (!playAvailable) {
-                n -> state.him_score += cpBoardScore(n -> state.him);
-                n -> leaf = true;
+            if (house_tested == MAX_HOUSE) {
+                if (n -> childs.size() == 0) {
+                    n -> state.him_score += cpBoardScore(n -> state.him);
+                    n -> leaf = true;
+                } else {
+                    n -> fullyExpanded = true;
+                }
+            } else {
+                Node* nn = nodes_pool[nodes_pool_index++];
+                nn -> state = ns;
+                nn -> parent = n;
+                nn -> myTurn = true;
+                nn -> turn = n -> turn + 1;
+                nn -> house = house;
+                n -> childs.push_back(nn);
             }
         }
-        n -> fullyExpanded = true;
-        return !n -> leaf;
+        return n -> fullyExpanded;
     }
 
     inline void backPropogation(Node* nodeToExplore, bool meWon) {
@@ -460,7 +465,7 @@ namespace P2 {
         // check if the current State is finished ?
         State tmpState = n -> state;
         int turn = n -> turn;
-        const int MAXTURN = 200;
+        const int MAXTURN = turn + 70;
         bool myTurn = n -> myTurn;
         int house = 0;
         int house_tested = 0;
